@@ -1,0 +1,42 @@
+<?php
+
+// Get the incoming SMS message
+$message = $_POST['Body'];
+$from = $_POST['From'];
+
+// Match the phone number to a lead in Bitrix24
+$leadID = false; // initialize as false
+$leads = bitrixREST('crm.lead.list', ['FILTER' => ['PHONE' => $from]]);
+if ($leads && count($leads) > 0) {
+    // Found a matching lead
+    $leadID = $leads[0]['ID'];
+}
+
+if ($leadID) {
+    // Add a comment with the SMS message to the lead
+    bitrixREST('crm.lead.comment.add', [
+        'ID' => $leadID,
+        'FIELDS' => [
+            'COMMENT' => $message
+        ]
+    ]);
+}
+
+// Helper function to make REST API requests to Bitrix24
+function bitrixREST($method, $params) {
+    $url = 'https://fundinggroup.bitrix24.com/rest/1/pr6wubufa1zwr5go/' . $method;
+    $query = http_build_query($params);
+    $curl = curl_init();
+    curl_setopt_array($curl, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_URL => $url . '?' . $query
+    ]);
+    $result = curl_exec($curl);
+    curl_close($curl);
+    $json = json_decode($result, true);
+    if ($json['error']) {
+        error_log($json['error_description']);
+        return null;
+    }
+    return $json['result'];
+}
